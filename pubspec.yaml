@@ -10,9 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  webview_flutter: ^3.0.0
   crypto: ^3.0.1
   eventify: ^1.0.0
+  flutter_inappwebview: ^5.4.3+7
   
 
 dev_dependencies:

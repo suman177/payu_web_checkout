@@ -1,7 +1,7 @@
-import 'dart:convert';
+import 'dart:collection';
 import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:payu_web_checkout/payu_web_checkout.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 // ignore: must_be_immutable
 class PayuWebCheckoutWidget extends StatefulWidget {
@@ -21,9 +21,29 @@ class PayuWebCheckoutWidget extends StatefulWidget {
 }
 
 class _PayuWebCheckoutWidgetState extends State<PayuWebCheckoutWidget> {
-  late WebViewController _controller;
   bool isLoading = true;
-  final _key = UniqueKey();
+  final GlobalKey webViewKey = GlobalKey();
+
+  InAppWebViewController? webViewController;
+
+  InAppWebViewGroupOptions options = InAppWebViewGroupOptions(
+      crossPlatform: InAppWebViewOptions(
+          useShouldOverrideUrlLoading: true,
+          mediaPlaybackRequiresUserGesture: false),
+      android: AndroidInAppWebViewOptions(
+        useHybridComposition: true,
+      ),
+      ios: IOSInAppWebViewOptions(
+        allowsInlineMediaPlayback: true,
+      ));
+
+  double progress = 0;
+
+  @override
+  void initState() {
+    _loadHtmlFromUrl();
+    super.initState();
+  }
 
   String webViewClientPost() {
     var buffer = StringBuffer();
@@ -114,28 +134,52 @@ class _PayuWebCheckoutWidgetState extends State<PayuWebCheckoutWidget> {
         ),
         body: Stack(
           children: [
-            WebView(
-              key: _key,
-              initialUrl: "about:blank",
-              onWebViewCreated: (WebViewController webViewController) {
-                _controller = webViewController;
+            InAppWebView(
+              key: webViewKey,
+              // contextMenu: contextMenu,
+              // initialUrlRequest:
+              //     URLRequest(url: ),
+              // initialFile: "assets/index.html",
+              initialUserScripts: UnmodifiableListView<UserScript>([]),
+              initialOptions: options,
+              onWebViewCreated: (controller) {
+                webViewController = controller;
                 _loadHtmlFromUrl();
               },
-              javascriptMode: JavascriptMode.unrestricted,
-              onPageFinished: (value) async {
-                await Future.delayed(const Duration(seconds: 2), () {
-                  setState(() {
-                    isLoading = false;
-                  });
-                });
-                if (value == widget.payuWebCheckoutModel.successUrl) {
+              onLoadStart: (controller, url) {
+                // setState(() {
+                //   this.url = url.toString();
+                //   urlController.text = this.url;
+                // });
+              },
+              androidOnPermissionRequest:
+                  (controller, origin, resources) async {
+                return PermissionRequestResponse(
+                    resources: resources,
+                    action: PermissionRequestResponseAction.GRANT);
+              },
+              shouldOverrideUrlLoading: (controller, navigationAction) async {
+                return NavigationActionPolicy.ALLOW;
+              },
+              onLoadStop: (controller, url) async {
+                print(url.toString());
+                if (url.toString() == widget.payuWebCheckoutModel.successUrl) {
                   Map<String, dynamic> parameter = {};
-                  String pTagLagth =
-                      await _controller.runJavascriptReturningResult(
+                  dynamic pTagLagth = await webViewController?.evaluateJavascript(
+                      source:
                           'window.document.getElementsByTagName("p").length;');
-                  for (int i = 0; i < int.parse(pTagLagth); i++) {
-                    String keyValue =
-                        await _controller.runJavascriptReturningResult(
+                  int tmpLagth = 0;
+                  if (pTagLagth is double) {
+                    tmpLagth = pTagLagth.toInt();
+                  } else if (pTagLagth is int) {
+                    tmpLagth = pTagLagth;
+                  } else {
+                    return;
+                  }
+
+                  for (int i = 0; i < tmpLagth; i++) {
+                    String keyValue = await webViewController?.evaluateJavascript(
+                        source:
                             'window.document.getElementsByTagName("p")[$i].innerHTML;');
 
                     parameter[keyValue.replaceAll("\"", "").split(":")[0]] =
@@ -143,16 +187,26 @@ class _PayuWebCheckoutWidgetState extends State<PayuWebCheckoutWidget> {
                   }
                   widget.onSuccess(parameter);
                   Navigator.pop(context);
-                } else if (value == widget.payuWebCheckoutModel.failedUrl) {
+                } else if (url.toString() ==
+                    widget.payuWebCheckoutModel.failedUrl) {
                   Map<String, dynamic> parameter = {};
 
-                  String pTagLagth =
-                      await _controller.runJavascriptReturningResult(
+                  dynamic pTagLagth = await webViewController?.evaluateJavascript(
+                      source:
                           'window.document.getElementsByTagName("p").length;');
 
-                  for (int i = 0; i < int.parse(pTagLagth); i++) {
-                    String keyValue =
-                        await _controller.runJavascriptReturningResult(
+                  int tmpLagth = 0;
+                  if (pTagLagth is double) {
+                    tmpLagth = pTagLagth.toInt();
+                  } else if (pTagLagth is int) {
+                    tmpLagth = pTagLagth;
+                  } else {
+                    return;
+                  }
+
+                  for (int i = 0; i < tmpLagth; i++) {
+                    String keyValue = await webViewController?.evaluateJavascript(
+                        source:
                             'window.document.getElementsByTagName("p")[$i].innerHTML;');
 
                     parameter[keyValue.replaceAll("\"", "").split(":")[0]] =
@@ -162,12 +216,76 @@ class _PayuWebCheckoutWidgetState extends State<PayuWebCheckoutWidget> {
                   Navigator.pop(context);
                 }
               },
+              onLoadError: (controller, url, code, message) {},
+              onProgressChanged: (controller, progress) {
+                setState(() {
+                  this.progress = progress / 100;
+                });
+              },
+              onUpdateVisitedHistory: (controller, url, androidIsReload) {},
+              onConsoleMessage: (controller, consoleMessage) {},
+              onReceivedServerTrustAuthRequest: (controller, challenge) async {
+                return ServerTrustAuthResponse(
+                    action: ServerTrustAuthResponseAction.PROCEED);
+              },
             ),
-            isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(),
-                  )
-                : Stack(),
+            progress < 1.0
+                ? LinearProgressIndicator(value: progress)
+                : Container(),
+            // WebView(
+            //   key: _key,
+            //   initialUrl: "about:blank",
+            //   onWebViewCreated: (WebViewController webViewController) {
+            //     _controller = webViewController;
+            //     _loadHtmlFromUrl();
+            //   },
+            //   javascriptMode: JavascriptMode.unrestricted,
+            //   onPageFinished: (value) async {
+            //     await Future.delayed(const Duration(seconds: 2), () {
+            //       setState(() {
+            //         isLoading = false;
+            //       });
+            //     });
+            //     if (value == widget.payuWebCheckoutModel.successUrl) {
+            //       Map<String, dynamic> parameter = {};
+            //       String pTagLagth =
+            //           await _controller.runJavascriptReturningResult(
+            //               'window.document.getElementsByTagName("p").length;');
+            //       for (int i = 0; i < int.parse(pTagLagth); i++) {
+            //         String keyValue =
+            //             await _controller.runJavascriptReturningResult(
+            //                 'window.document.getElementsByTagName("p")[$i].innerHTML;');
+
+            //         parameter[keyValue.replaceAll("\"", "").split(":")[0]] =
+            //             keyValue.replaceAll("\"", "").split(":")[1];
+            //       }
+            //       widget.onSuccess(parameter);
+            //       Navigator.pop(context);
+            //     } else if (value == widget.payuWebCheckoutModel.failedUrl) {
+            //       Map<String, dynamic> parameter = {};
+
+            //       String pTagLagth =
+            //           await _controller.runJavascriptReturningResult(
+            //               'window.document.getElementsByTagName("p").length;');
+
+            //       for (int i = 0; i < int.parse(pTagLagth); i++) {
+            //         String keyValue =
+            //             await _controller.runJavascriptReturningResult(
+            //                 'window.document.getElementsByTagName("p")[$i].innerHTML;');
+
+            //         parameter[keyValue.replaceAll("\"", "").split(":")[0]] =
+            //             keyValue.replaceAll("\"", "").split(":")[1];
+            //       }
+            //       widget.onFailed(parameter);
+            //       Navigator.pop(context);
+            //     }
+            //   },
+            // ),
+            // isLoading
+            //     ? const Center(
+            //         child: CircularProgressIndicator(),
+            //       )
+            //     : Stack(),
           ],
         ),
       ),
@@ -175,8 +293,9 @@ class _PayuWebCheckoutWidgetState extends State<PayuWebCheckoutWidget> {
   }
 
   _loadHtmlFromUrl() async {
-    _controller.loadUrl(Uri.dataFromString(webViewClientPost(),
-            mimeType: 'text/html', encoding: Encoding.getByName('utf-8'))
-        .toString());
+    webViewController?.loadData(data: webViewClientPost());
+    // webViewController?.loadUrl(Uri.dataFromString(webViewClientPost(),
+    //         mimeType: 'text/html', encoding: Encoding.getByName('utf-8'))
+    //     .toString());
   }
 }

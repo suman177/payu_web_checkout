@@ -1,10 +1,12 @@
 library payu_web_checkout;
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:eventify/eventify.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'payu_web_checkout_widget.dart';
 import 'payu_web_checkout_model.dart';
 
@@ -18,6 +20,32 @@ class PayUWebCheckout {
 
   PayUWebCheckout() {
     _eventEmitter = EventEmitter();
+    onInit();
+  }
+
+  Future onInit() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    if (Platform.isAndroid) {
+      await AndroidInAppWebViewController.setWebContentsDebuggingEnabled(true);
+
+      var swAvailable = await AndroidWebViewFeature.isFeatureSupported(
+          AndroidWebViewFeature.SERVICE_WORKER_BASIC_USAGE);
+      var swInterceptAvailable = await AndroidWebViewFeature.isFeatureSupported(
+          AndroidWebViewFeature.SERVICE_WORKER_SHOULD_INTERCEPT_REQUEST);
+
+      if (swAvailable && swInterceptAvailable) {
+        AndroidServiceWorkerController serviceWorkerController =
+            AndroidServiceWorkerController.instance();
+
+        await serviceWorkerController
+            .setServiceWorkerClient(AndroidServiceWorkerClient(
+          shouldInterceptRequest: (request) async {
+            print(request);
+            return null;
+          },
+        ));
+      }
+    }
   }
 
   /// Opens PayUMoney checkout
