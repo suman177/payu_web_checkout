@@ -113,25 +113,25 @@ class _PayuWebCheckoutWidgetState extends State<PayuWebCheckoutWidget> {
         return Future.value(false);
       },
       child: Scaffold(
-        appBar: AppBar(
-          centerTitle: false,
-          titleSpacing: 0.0,
-          title: Text("Order #${widget.payuWebCheckoutModel.txnId}",
-              style:
-                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          actions: [
-            Center(
-              child: Text(
-                "₹ ${widget.payuWebCheckoutModel.amount}",
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(
-              width: 10,
-            ),
-          ],
-        ),
+        // appBar: AppBar(
+        //   centerTitle: false,
+        //   titleSpacing: 0.0,
+        //   title: Text("Order #${widget.payuWebCheckoutModel.txnId}",
+        //       style:
+        //           const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        //   actions: [
+        //     Center(
+        //       child: Text(
+        //         "₹ ${widget.payuWebCheckoutModel.amount}",
+        //         style:
+        //             const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        //       ),
+        //     ),
+        //     const SizedBox(
+        //       width: 10,
+        //     ),
+        //   ],
+        // ),
         body: Stack(
           children: [
             InAppWebView(
